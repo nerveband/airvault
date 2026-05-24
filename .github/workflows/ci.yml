@@ -16,6 +16,7 @@ jobs:
       - run: go build -o airvault .
       - run: ./airvault schema --format json
       - run: ./airvault schema --validate --format json
+      - run: ./airvault config defaults --format json
       - run: ./airvault export sqlite --help
       - run: ./airvault backup create --help
       - run: ./airvault test full --out /tmp/airvault-ci-test --overwrite --format json

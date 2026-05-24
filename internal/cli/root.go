@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/nerveband/airvault/internal/airtable"
 	"github.com/nerveband/airvault/internal/archive"
@@ -181,15 +183,28 @@ func backupCmd() *cobra.Command {
 	var resumeJob string
 	cmd := &cobra.Command{Use: "backup", Short: "Create and verify Airtable backups"}
 	create := &cobra.Command{Use: "create", Short: "Create a local backup archive", Example: "  airvault backup create --out ./airtable-backup --format json\n  airvault backup create --base appXXXXXXXX --include schema,records --out ./schema-records\n  airvault backup create --table Students --exclude attachments --out ./students", RunE: func(cmd *cobra.Command, args []string) error {
+		defaults := loadDefaults()
+		if out == "" && defaults.BackupRoot != "" {
+			out = filepath.Join(defaults.BackupRoot, "runs", time.Now().Format("2006-01-02_150405"))
+		}
 		if out == "" {
-			return &output.Error{Code: "VALIDATION_MISSING_OUT", Message: "--out is required", Hint: "Run: airvault backup create --out ./airtable-backup", ExitCode: output.ExitValidation}
+			return &output.Error{Code: "VALIDATION_MISSING_OUT", Message: "--out is required", Hint: "Run: airvault backup create --out ./airtable-backup or configure backup_root", ExitCode: output.ExitValidation}
+		}
+		if len(include) == 0 {
+			include = defaults.Include
+		}
+		if len(exclude) == 0 {
+			exclude = defaults.Exclude
 		}
 		components, err := archive.ParseComponents(include, exclude)
 		if err != nil {
 			return &output.Error{Code: "VALIDATION_BAD_COMPONENT", Message: err.Error(), ExitCode: output.ExitValidation}
 		}
-		if noAttachments {
+		if noAttachments || defaults.NoAttachments {
 			components.Attachments = false
+		}
+		if maxAttachmentBytes == 0 {
+			maxAttachmentBytes = defaults.MaxAttachmentBytes
 		}
 		c, err := client()
 		if err != nil {
@@ -230,9 +245,16 @@ func verifyCommand() *cobra.Command {
 	var mode string
 	var sampleSize int
 	cmd := &cobra.Command{Use: "verify --path <backup>", Short: "Verify backup integrity", Example: "  airvault backup verify --path ./backup --mode exists\n  airvault backup verify --path ./backup --mode sample --sample-size 50\n  airvault backup verify --path ./backup --mode full", RunE: func(cmd *cobra.Command, args []string) error {
+		defaults := loadDefaults()
 		path, _ := cmd.Flags().GetString("path")
 		if path == "" {
 			return &output.Error{Code: "VALIDATION_MISSING_PATH", Message: "--path is required", ExitCode: output.ExitValidation}
+		}
+		if !cmd.Flags().Changed("mode") && defaults.VerifyMode != "" {
+			mode = defaults.VerifyMode
+		}
+		if !cmd.Flags().Changed("sample-size") && defaults.SampleSize > 0 {
+			sampleSize = defaults.SampleSize
 		}
 		report, err := archive.VerifyWithOptions(path, archive.VerifyOptions{Mode: archive.VerifyMode(mode), SampleSize: sampleSize})
 		if err != nil {
@@ -314,6 +336,14 @@ func exportCmd() *cobra.Command {
 	return cmd
 }
 
+func loadDefaults() config.Defaults {
+	store, err := config.Load()
+	if err != nil {
+		return config.BuiltinDefaults()
+	}
+	return store.Defaults
+}
+
 func testCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "test", Short: "Run backup integrity tests"}
 	var out string
@@ -365,7 +395,7 @@ func testCmd() *cobra.Command {
 			return &output.Error{Code: "VALIDATION_MISSING_INPUT", Message: "--path and --out are required", ExitCode: output.ExitValidation}
 		}
 		if len(exporters) == 0 {
-			exporters = []string{"jsonl", "sqlite", "postgres"}
+			exporters = loadDefaults().Exporters
 		}
 		results := []any{}
 		for _, name := range exporters {
@@ -406,7 +436,7 @@ func testCmd() *cobra.Command {
 			return err
 		}
 		exportResults := []any{}
-		for _, name := range []string{"jsonl", "sqlite", "postgres"} {
+		for _, name := range loadDefaults().Exporters {
 			e, err := exporter.Get(name)
 			if err != nil {
 				return err
@@ -495,8 +525,61 @@ func configCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return output.Write(cmd.OutOrStdout(), format, map[string]any{"precedence": []string{"--token", "AIRTABLE_TOKEN", "--profile token env", "--profile token"}, "config": store.Redacted()}, nil)
+		return output.Write(cmd.OutOrStdout(), format, map[string]any{"precedence": []string{"explicit flags", "--token", "AIRTABLE_TOKEN", "--profile token env", "--profile token", "config defaults", "builtin defaults"}, "config": store.Redacted()}, nil)
 	}})
+	cmd.AddCommand(&cobra.Command{Use: "defaults", Short: "Show effective defaults", Example: "  airvault config defaults --format json", RunE: func(cmd *cobra.Command, args []string) error {
+		return output.Write(cmd.OutOrStdout(), format, loadDefaults(), nil)
+	}})
+	var backupRoot, verifyMode string
+	var include, exclude, exporters []string
+	var sampleSize int
+	var noAttachments bool
+	var maxAttachmentBytes int64
+	setDefaults := &cobra.Command{Use: "set-defaults", Short: "Set workflow defaults", Example: "  airvault config set-defaults --backup-root ./airtable-backups --verify-mode exists --sample-size 25", RunE: func(cmd *cobra.Command, args []string) error {
+		store, err := config.Load()
+		if err != nil {
+			return err
+		}
+		d := store.Defaults
+		if cmd.Flags().Changed("backup-root") {
+			d.BackupRoot = backupRoot
+		}
+		if cmd.Flags().Changed("include") {
+			d.Include = include
+		}
+		if cmd.Flags().Changed("exclude") {
+			d.Exclude = exclude
+		}
+		if cmd.Flags().Changed("verify-mode") {
+			d.VerifyMode = verifyMode
+		}
+		if cmd.Flags().Changed("sample-size") {
+			d.SampleSize = sampleSize
+		}
+		if cmd.Flags().Changed("exporter") {
+			d.Exporters = exporters
+		}
+		if cmd.Flags().Changed("no-attachments") {
+			d.NoAttachments = noAttachments
+		}
+		if cmd.Flags().Changed("max-attachment-bytes") {
+			d.MaxAttachmentBytes = maxAttachmentBytes
+		}
+		store.Defaults = config.MergeDefaults(config.BuiltinDefaults(), d)
+		if err := config.Save(store); err != nil {
+			return err
+		}
+		return output.Write(cmd.OutOrStdout(), format, store.Redacted().Defaults, nil)
+	}}
+	setDefaults.Flags().StringVar(&backupRoot, "backup-root", "", "Default backup root; backup create without --out writes runs/<timestamp>")
+	setDefaults.Flags().StringSliceVar(&include, "include", nil, "Default backup components")
+	setDefaults.Flags().StringSliceVar(&exclude, "exclude", nil, "Default excluded backup components")
+	setDefaults.Flags().StringVar(&verifyMode, "verify-mode", "exists", "Default verify mode")
+	setDefaults.Flags().IntVar(&sampleSize, "sample-size", 25, "Default sample size")
+	setDefaults.Flags().StringSliceVar(&exporters, "exporter", nil, "Default exporters")
+	setDefaults.Flags().BoolVar(&noAttachments, "no-attachments", false, "Default to metadata-only attachments")
+	setDefaults.Flags().Int64Var(&maxAttachmentBytes, "max-attachment-bytes", 0, "Default max attachment size")
+	cmd.AddCommand(setDefaults)
 	return cmd
 }
 

@@ -41,6 +41,13 @@ airvault test verify --path ./airtable-backup --mode exists --format json
 airvault test export --path ./airtable-backup --out /tmp/airvault-export-test --format json
 ```
 
+Defaults:
+
+```bash
+airvault config defaults --format json
+airvault config set-defaults --backup-root ./airtable-backups --verify-mode exists --sample-size 25
+```
+
 ## Notes
 
 - Attachment URLs expire, so real backup runs download files immediately.

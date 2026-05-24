@@ -50,7 +50,11 @@ Profiles and config:
 ```bash
 airvault profile set --name personal --token-env AIRTABLE_TOKEN
 airvault config inspect --format json
+airvault config defaults --format json
+airvault config set-defaults --backup-root ./airtable-backups --verify-mode exists --sample-size 25
 ```
+
+With `backup_root` configured, `airvault backup create` can omit `--out`; it writes to `BACKUP_ROOT/runs/<timestamp>`.
 
 Backup testing:
 
