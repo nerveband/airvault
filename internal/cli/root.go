@@ -20,10 +20,11 @@ import (
 )
 
 var (
-	Version = "dev"
-	format  = "auto"
-	token   = ""
-	profile = ""
+	Version    = "dev"
+	format     = "auto"
+	token      = ""
+	profile    = ""
+	jsonOutput bool
 )
 
 func Execute() {
@@ -49,8 +50,14 @@ func root() *cobra.Command {
 		Long:          "Airvault backs up Airtable schemas, records, linked record IDs, attachments, and gap reports into a verifiable local archive.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			if jsonOutput {
+				format = "json"
+			}
+		},
 	}
 	cmd.PersistentFlags().StringVar(&format, "format", "auto", "Output format: auto, json, ndjson, table")
+	cmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Alias for --format json")
 	cmd.PersistentFlags().StringVar(&token, "token", "", "Airtable PAT (prefer AIRTABLE_TOKEN)")
 	cmd.PersistentFlags().StringVar(&profile, "profile", "", "Named profile from ~/.airvault/config.json")
 	cmd.AddCommand(versionCmd(), schemaCmd(), agentContextCmd(), skillPathCmd(), authCmd(), basesCmd(), estimateCmd(), backupCmd(), verifyCmd(), exportCmd(), testCmd(), profileCmd(), configCmd(), jobsCmd(), feedbackCmd(), upgradeCmd())
@@ -283,9 +290,25 @@ func schemaCmd() *cobra.Command {
 func agentContextCmd() *cobra.Command {
 	return &cobra.Command{Use: "agent-context", Short: "Print agent-oriented usage contract", RunE: func(cmd *cobra.Command, args []string) error {
 		return output.Write(cmd.OutOrStdout(), "json", map[string]any{
-			"name": "airvault", "version": Version,
-			"guardrails":       []string{"Use AIRTABLE_TOKEN instead of --token when possible", "Run estimate before backup", "Use backup verify after backup", "Rotate Airtable PATs after emergency backup sessions"},
-			"common_workflows": []string{"airvault estimate --format json", "airvault backup create --out ./airtable-backup --format json", "airvault backup verify --path ./airtable-backup --format json"},
+			"name":           "airvault",
+			"version":        Version,
+			"schema_version": "airvault-cli-schema-v2",
+			"defaults":       loadDefaults(),
+			"guardrails": []string{
+				"Use AIRTABLE_TOKEN instead of --token when possible",
+				"Run estimate before large live backups",
+				"Use backup verify --mode exists for fast routine checks",
+				"Use backup verify --mode full only when every attachment hash must be rechecked",
+				"Rotate Airtable PATs after emergency backup sessions",
+				"Review api-telemetry.json and gap-report.json after backups",
+			},
+			"common_workflows": []string{
+				"airvault config defaults --format json",
+				"airvault estimate --format json",
+				"airvault backup create --format json",
+				"airvault backup verify --path ./airtable-backup --mode exists --format json",
+				"airvault test export --path ./airtable-backup --out /tmp/airvault-export-test --format json",
+			},
 		}, nil)
 	}}
 }
@@ -636,7 +659,7 @@ func upgradeCmd() *cobra.Command {
 
 func commandSchema() map[string]any {
 	return map[string]any{
-		"schema_version": "airvault-cli-schema-v1",
+		"schema_version": "airvault-cli-schema-v2",
 		"commands": []map[string]any{
 			{"name": "auth doctor", "readonly": true, "idempotent": true},
 			{"name": "bases list", "readonly": true, "idempotent": true},

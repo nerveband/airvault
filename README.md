@@ -76,4 +76,4 @@ airvault agent-context
 airvault skill-path
 ```
 
-Use `--format json` for deterministic output. Errors are structured on stderr in non-TTY or `AI_AGENT` contexts.
+Use `--format json` or `--json` for deterministic output. Errors are structured on stderr in non-TTY or `AI_AGENT` contexts.

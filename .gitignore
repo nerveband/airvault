@@ -1,5 +1,7 @@
 airvault
 dist/
+*.sqlite
+*.sql
 *.test
 coverage.out
 .DS_Store

@@ -148,7 +148,7 @@ Important files inside an archive:
 - Use `--include comments` only when comments are needed; it can add many API calls.
 - Review `api-telemetry.json` after long runs for rate limits or restrictions.
 - Treat `gap-report.json` as part of the backup. Interfaces, automations, extensions, permissions, and some UI-only state are not fully portable.
-- Prefer `--format json` for deterministic output.
+- Prefer `--format json` or `--json` for deterministic output.
 - Prefer `--deliver file:<path>` when result metadata should be written atomically.
 
 ## Current Local Convention
@@ -164,4 +164,3 @@ Confirm with:
 ```bash
 airvault config defaults --format json
 ```
-
