@@ -34,7 +34,10 @@ Testing:
 
 ```bash
 airvault test full --out /tmp/airvault-test --overwrite --format json
-airvault test verify --path ./airtable-backup --format json
+airvault backup verify --path ./airtable-backup --mode exists --format json
+airvault backup verify --path ./airtable-backup --mode sample --sample-size 50 --format json
+airvault backup verify --path ./airtable-backup --mode full --format json
+airvault test verify --path ./airtable-backup --mode exists --format json
 airvault test export --path ./airtable-backup --out /tmp/airvault-export-test --format json
 ```
 

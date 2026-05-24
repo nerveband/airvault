@@ -1,7 +1,6 @@
 package archive
 
 import (
-	"bufio"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -99,36 +98,11 @@ func Create(ctx context.Context, client *airtable.Client, bases []airtable.Base,
 }
 
 func Verify(path string) (*Manifest, error) {
-	data, err := os.ReadFile(filepath.Join(path, "manifest.json"))
-	if err != nil {
-		return nil, err
+	report, err := VerifyWithOptions(path, VerifyOptions{Mode: VerifyFull})
+	if report != nil && report.Manifest != nil {
+		return report.Manifest, err
 	}
-	var manifest Manifest
-	if err := json.Unmarshal(data, &manifest); err != nil {
-		return nil, err
-	}
-	checkPath := filepath.Join(path, "checksums.sha256")
-	f, err := os.Open(checkPath)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		parts := strings.Fields(scanner.Text())
-		if len(parts) < 2 {
-			continue
-		}
-		want, rel := parts[0], parts[1]
-		got, err := fileSHA256(filepath.Join(path, rel))
-		if err != nil {
-			return nil, fmt.Errorf("verify %s: %w", rel, err)
-		}
-		if got != want {
-			return nil, fmt.Errorf("checksum mismatch for %s", rel)
-		}
-	}
-	return &manifest, scanner.Err()
+	return nil, err
 }
 
 func run(ctx context.Context, client *airtable.Client, bases []airtable.Base, opts Options) (*Manifest, error) {

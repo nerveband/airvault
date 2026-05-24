@@ -19,3 +19,5 @@ jobs:
       - run: ./airvault export sqlite --help
       - run: ./airvault backup create --help
       - run: ./airvault test full --out /tmp/airvault-ci-test --overwrite --format json
+      - run: ./airvault backup verify --path /tmp/airvault-ci-test/fixture --mode exists --format json
+      - run: ./airvault backup verify --path /tmp/airvault-ci-test/fixture --mode sample --sample-size 1 --format json

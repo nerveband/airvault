@@ -227,18 +227,22 @@ func verifyCmd() *cobra.Command {
 }
 
 func verifyCommand() *cobra.Command {
-	cmd := &cobra.Command{Use: "verify --path <backup>", Short: "Verify backup manifest and attachment checksums", RunE: func(cmd *cobra.Command, args []string) error {
+	var mode string
+	var sampleSize int
+	cmd := &cobra.Command{Use: "verify --path <backup>", Short: "Verify backup integrity", Example: "  airvault backup verify --path ./backup --mode exists\n  airvault backup verify --path ./backup --mode sample --sample-size 50\n  airvault backup verify --path ./backup --mode full", RunE: func(cmd *cobra.Command, args []string) error {
 		path, _ := cmd.Flags().GetString("path")
 		if path == "" {
 			return &output.Error{Code: "VALIDATION_MISSING_PATH", Message: "--path is required", ExitCode: output.ExitValidation}
 		}
-		m, err := archive.Verify(path)
+		report, err := archive.VerifyWithOptions(path, archive.VerifyOptions{Mode: archive.VerifyMode(mode), SampleSize: sampleSize})
 		if err != nil {
 			return &output.Error{Code: "VERIFY_FAILED", Message: err.Error(), ExitCode: output.ExitConflict}
 		}
-		return output.Write(cmd.OutOrStdout(), format, map[string]any{"ok": true, "manifest": m}, nil)
+		return output.Write(cmd.OutOrStdout(), format, report, nil)
 	}}
 	cmd.Flags().String("path", "", "Backup archive path")
+	cmd.Flags().StringVar(&mode, "mode", "full", "Verify mode: manifest, ledger, exists, sample, health, full")
+	cmd.Flags().IntVar(&sampleSize, "sample-size", 25, "Files to hash in sample/health mode")
 	return cmd
 }
 
@@ -337,30 +341,21 @@ func testCmd() *cobra.Command {
 	cmd.AddCommand(fixture)
 
 	var path string
-	verify := &cobra.Command{Use: "verify", Short: "Verify an archive and report integrity checks", Example: "  airvault test verify --path ./airtable-backup --format json", RunE: func(cmd *cobra.Command, args []string) error {
+	var verifyMode string
+	var verifySampleSize int
+	verify := &cobra.Command{Use: "verify", Short: "Verify an archive and report integrity checks", Example: "  airvault test verify --path ./airtable-backup --mode exists --format json", RunE: func(cmd *cobra.Command, args []string) error {
 		if path == "" {
 			return &output.Error{Code: "VALIDATION_MISSING_PATH", Message: "--path is required", ExitCode: output.ExitValidation}
 		}
-		m, err := archive.Verify(path)
+		report, err := archive.VerifyWithOptions(path, archive.VerifyOptions{Mode: archive.VerifyMode(verifyMode), SampleSize: verifySampleSize})
 		if err != nil {
 			return &output.Error{Code: "TEST_VERIFY_FAILED", Message: err.Error(), ExitCode: output.ExitConflict}
-		}
-		report := map[string]any{
-			"ok":           true,
-			"archive_path": path,
-			"checks": map[string]bool{
-				"manifest":  fileExists(path + "/manifest.json"),
-				"checksums": fileExists(path + "/checksums.sha256"),
-				"jobs":      dirExists(path + "/jobs"),
-				"telemetry": fileExists(path + "/api-telemetry.json"),
-				"verify":    true,
-			},
-			"totals":        m.Totals,
-			"api_telemetry": m.APITelemetry,
 		}
 		return output.Write(cmd.OutOrStdout(), format, report, nil)
 	}}
 	verify.Flags().StringVar(&path, "path", "", "Archive path")
+	verify.Flags().StringVar(&verifyMode, "mode", "exists", "Verify mode: manifest, ledger, exists, sample, health, full")
+	verify.Flags().IntVar(&verifySampleSize, "sample-size", 25, "Files to hash in sample/health mode")
 	cmd.AddCommand(verify)
 
 	var exportOut string
@@ -564,10 +559,10 @@ func commandSchema() map[string]any {
 			{"name": "bases list", "readonly": true, "idempotent": true},
 			{"name": "estimate", "readonly": true, "idempotent": true, "flags": []string{"--base", "--table"}},
 			{"name": "backup create", "readonly": false, "destructive": false, "idempotent": true, "dry_run": true, "scope": "remote-read/local-write", "flags": []string{"--out", "--base", "--table", "--include", "--exclude", "--dry-run", "--no-attachments", "--max-attachment-bytes", "--resume-job"}},
-			{"name": "backup verify", "readonly": true, "idempotent": true, "flags": []string{"--path"}},
+			{"name": "backup verify", "readonly": true, "idempotent": true, "flags": []string{"--path", "--mode", "--sample-size"}},
 			{"name": "export", "readonly": false, "destructive": false, "idempotent": true, "flags": []string{"--path", "--out", "--deliver", "--overwrite", "--plan"}},
 			{"name": "test fixture", "readonly": false, "destructive": false, "idempotent": true, "flags": []string{"--out", "--overwrite"}},
-			{"name": "test verify", "readonly": true, "idempotent": true, "flags": []string{"--path"}},
+			{"name": "test verify", "readonly": true, "idempotent": true, "flags": []string{"--path", "--mode", "--sample-size"}},
 			{"name": "test export", "readonly": false, "destructive": false, "idempotent": true, "flags": []string{"--path", "--out", "--exporter"}},
 			{"name": "test full", "readonly": false, "destructive": false, "idempotent": true, "flags": []string{"--out", "--overwrite"}},
 			{"name": "profile list", "readonly": true, "idempotent": true},
