@@ -187,10 +187,10 @@ func run(ctx context.Context, client *airtable.Client, bases []airtable.Base, op
 					return nil, err
 				}
 			}
-			attachmentFields := map[string]bool{}
+			attachmentFields := map[string]string{}
 			for _, field := range table.Fields {
 				if field.Type == "multipleAttachments" {
-					attachmentFields[field.Name] = true
+					attachmentFields[field.ID] = field.Name
 				}
 			}
 			err := client.EachRecord(ctx, base.ID, table.Name, func(rec airtable.Record) error {
@@ -200,11 +200,11 @@ func run(ctx context.Context, client *airtable.Client, bases []airtable.Base, op
 						return err
 					}
 				}
-				for fname := range attachmentFields {
-					for _, att := range airtable.AttachmentsFromValue(rec.Fields[fname]) {
+				for fieldID, fieldName := range attachmentFields {
+					for _, att := range airtable.AttachmentsFromValue(rec.Fields[fieldID]) {
 						tsum.Attachments++
 						tsum.AttachmentBytes += att.Size
-						ar := AttachmentRecord{BaseID: base.ID, TableID: table.ID, TableName: table.Name, RecordID: rec.ID, FieldName: fname, Attachment: att}
+						ar := AttachmentRecord{BaseID: base.ID, TableID: table.ID, TableName: table.Name, RecordID: rec.ID, FieldName: fieldName, Attachment: att}
 						if !opts.DryRun && opts.DownloadAttachments {
 							rel := filepath.Join("bases", base.ID, "attachments", table.ID, rec.ID, sanitize(att.ID+"__"+att.Filename))
 							ar.Path = rel

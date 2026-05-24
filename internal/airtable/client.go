@@ -97,7 +97,7 @@ func (c *Client) Schema(ctx context.Context, baseID string) (*Schema, error) {
 func (c *Client) EachRecord(ctx context.Context, baseID, tableName string, fn func(Record) error) error {
 	offset := ""
 	for {
-		values := url.Values{"pageSize": {"100"}, "cellFormat": {"json"}}
+		values := url.Values{"pageSize": {"100"}, "cellFormat": {"json"}, "returnFieldsByFieldId": {"true"}}
 		if offset != "" {
 			values.Set("offset", offset)
 		}
