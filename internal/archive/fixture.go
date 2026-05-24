@@ -27,7 +27,10 @@ func WriteFixture(path string) (*Manifest, error) {
 			Tables:  []TableSummary{{ID: tableID, Name: "Fixture Table", Records: 2, Attachments: 1, AttachmentBytes: 12}},
 			Records: 2, Attachments: 1, AttachmentBytes: 12,
 		}},
-		Totals:      Totals{Bases: 1, Tables: 1, Records: 2, Attachments: 1, AttachmentBytes: 12},
+		Totals: Totals{Bases: 1, Tables: 1, Records: 2, Attachments: 1, AttachmentBytes: 12},
+		APITelemetry: &airtable.Telemetry{
+			StartedAt: time.Now(), FinishedAt: time.Now(), StatusCounts: map[int]int64{}, ByBase: map[string]airtable.BaseStats{},
+		},
 		Unsupported: []string{"fixture: unsupported surfaces are intentionally represented"},
 	}
 	baseDir := filepath.Join(path, "bases", baseID)
@@ -84,6 +87,9 @@ func WriteFixture(path string) (*Manifest, error) {
 		return nil, err
 	}
 	if err := writeJSON(filepath.Join(path, "gap-report.json"), manifest.Unsupported); err != nil {
+		return nil, err
+	}
+	if err := writeJSON(filepath.Join(path, "api-telemetry.json"), manifest.APITelemetry); err != nil {
 		return nil, err
 	}
 	if err := writeJSON(filepath.Join(path, "manifest.json"), manifest); err != nil {

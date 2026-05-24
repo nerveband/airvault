@@ -18,15 +18,16 @@ import (
 )
 
 type Manifest struct {
-	ArchiveVersion string        `json:"archive_version"`
-	ToolVersion    string        `json:"tool_version"`
-	JobID          string        `json:"job_id,omitempty"`
-	Selection      Selection     `json:"selection"`
-	StartedAt      time.Time     `json:"started_at"`
-	FinishedAt     time.Time     `json:"finished_at,omitempty"`
-	Bases          []BaseSummary `json:"bases"`
-	Totals         Totals        `json:"totals"`
-	Unsupported    []string      `json:"unsupported"`
+	ArchiveVersion string              `json:"archive_version"`
+	ToolVersion    string              `json:"tool_version"`
+	JobID          string              `json:"job_id,omitempty"`
+	Selection      Selection           `json:"selection"`
+	StartedAt      time.Time           `json:"started_at"`
+	FinishedAt     time.Time           `json:"finished_at,omitempty"`
+	Bases          []BaseSummary       `json:"bases"`
+	Totals         Totals              `json:"totals"`
+	APITelemetry   *airtable.Telemetry `json:"api_telemetry,omitempty"`
+	Unsupported    []string            `json:"unsupported"`
 }
 
 type BaseSummary struct {
@@ -321,7 +322,12 @@ func run(ctx context.Context, client *airtable.Client, bases []airtable.Base, op
 		manifest.Bases = append(manifest.Bases, bsum)
 	}
 	manifest.FinishedAt = time.Now()
+	telemetry := client.FinishTelemetry()
+	manifest.APITelemetry = &telemetry
 	if !opts.DryRun {
+		if err := writeJSON(filepath.Join(opts.Out, "api-telemetry.json"), telemetry); err != nil {
+			return nil, err
+		}
 		if err := writeJSON(filepath.Join(opts.Out, "jobs", jobID+".json"), manifest); err != nil {
 			return nil, err
 		}

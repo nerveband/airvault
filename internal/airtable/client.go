@@ -17,10 +17,25 @@ const API = "https://api.airtable.com/v0"
 type Client struct {
 	Token      string
 	HTTPClient *http.Client
+	telemetry  *telemetryRecorder
 }
 
 func New(token string) *Client {
-	return &Client{Token: token, HTTPClient: &http.Client{Timeout: 60 * time.Second}}
+	return &Client{Token: token, HTTPClient: &http.Client{Timeout: 60 * time.Second}, telemetry: newTelemetryRecorder()}
+}
+
+func (c *Client) Telemetry() Telemetry {
+	if c.telemetry == nil {
+		c.telemetry = newTelemetryRecorder()
+	}
+	return c.telemetry.snapshot()
+}
+
+func (c *Client) FinishTelemetry() Telemetry {
+	if c.telemetry == nil {
+		c.telemetry = newTelemetryRecorder()
+	}
+	return c.telemetry.finish()
 }
 
 type Base struct {
@@ -165,11 +180,19 @@ func (c *Client) Download(ctx context.Context, rawurl string, w io.Writer) error
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		return fmt.Errorf("download returned HTTP %d", resp.StatusCode)
 	}
-	_, err = io.Copy(w, resp.Body)
+	n, err := io.Copy(w, resp.Body)
+	if c.telemetry != nil {
+		c.telemetry.observeDownload(n)
+	}
 	return err
 }
 
 func (c *Client) getJSON(ctx context.Context, endpoint string, out any) error {
+	if c.telemetry == nil {
+		c.telemetry = newTelemetryRecorder()
+	}
+	baseID := baseIDFromEndpoint(endpoint)
+	c.telemetry.pace(baseID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return err
@@ -179,20 +202,24 @@ func (c *Client) getJSON(ctx context.Context, endpoint string, out any) error {
 	for attempt := 0; attempt < 5; attempt++ {
 		resp, err := c.HTTPClient.Do(req.Clone(ctx))
 		if err != nil {
+			c.telemetry.observeNetworkError(baseID, endpoint, err)
 			return err
 		}
 		body, readErr := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		if readErr != nil {
+			c.telemetry.observeNetworkError(baseID, endpoint, readErr)
 			return readErr
 		}
+		c.telemetry.observe(baseID, endpoint, resp.StatusCode)
 		if resp.StatusCode == http.StatusTooManyRequests {
-			sleep := time.Duration(attempt+1) * time.Second
+			sleep := 30 * time.Second
 			if retryAfter := resp.Header.Get("Retry-After"); retryAfter != "" {
 				if seconds, err := strconv.Atoi(retryAfter); err == nil {
 					sleep = time.Duration(seconds) * time.Second
 				}
 			}
+			c.telemetry.observeRateLimit(baseID, endpoint, sleep)
 			time.Sleep(sleep)
 			continue
 		}

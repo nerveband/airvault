@@ -45,3 +45,4 @@ airvault test export --path ./airtable-backup --out /tmp/airvault-export-test --
 - Formula field definitions are preserved in schema metadata when Airtable exposes them, but formulas are not translated to other tools.
 - Comments are backed up only when `--include comments` is set and the token has the required scope.
 - Interfaces, automations, extensions, and permissions are reported in `gap-report.json` as unsupported surfaces.
+- API restrictions and rate limits are reported in `api-telemetry.json`. Review it after live runs.

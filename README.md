@@ -4,6 +4,8 @@ Comprehensive Airtable backup CLI for local, verifiable archives.
 
 `airvault` backs up Airtable metadata, tables, fields, records, linked record IDs, attachments, checksums, and a gap report for Airtable surfaces that are not exposed through public APIs.
 
+Each backup also writes `api-telemetry.json` with request counts, status-code counts, 429/rate-limit events, retry sleep time, per-base API stats, and restrictions such as auth/scope/permission failures.
+
 ## Install
 
 ```bash

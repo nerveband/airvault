@@ -352,9 +352,11 @@ func testCmd() *cobra.Command {
 				"manifest":  fileExists(path + "/manifest.json"),
 				"checksums": fileExists(path + "/checksums.sha256"),
 				"jobs":      dirExists(path + "/jobs"),
+				"telemetry": fileExists(path + "/api-telemetry.json"),
 				"verify":    true,
 			},
-			"totals": m.Totals,
+			"totals":        m.Totals,
+			"api_telemetry": m.APITelemetry,
 		}
 		return output.Write(cmd.OutOrStdout(), format, report, nil)
 	}}
