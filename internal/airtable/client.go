@@ -69,6 +69,11 @@ type RecordsPage struct {
 	Offset  string   `json:"offset,omitempty"`
 }
 
+type CommentsPage struct {
+	Comments []map[string]any `json:"comments"`
+	Offset   string           `json:"offset,omitempty"`
+}
+
 type Attachment struct {
 	ID         string         `json:"id"`
 	URL        string         `json:"url"`
@@ -108,6 +113,34 @@ func (c *Client) EachRecord(ctx context.Context, baseID, tableName string, fn fu
 		}
 		for _, rec := range page.Records {
 			if err := fn(rec); err != nil {
+				return err
+			}
+		}
+		if page.Offset == "" {
+			return nil
+		}
+		offset = page.Offset
+		time.Sleep(220 * time.Millisecond)
+	}
+}
+
+func (c *Client) EachComment(ctx context.Context, baseID, tableIDOrName, recordID string, fn func(map[string]any) error) error {
+	offset := ""
+	for {
+		values := url.Values{}
+		if offset != "" {
+			values.Set("offset", offset)
+		}
+		endpoint := API + "/" + url.PathEscape(baseID) + "/" + url.PathEscape(tableIDOrName) + "/" + url.PathEscape(recordID) + "/comments"
+		if encoded := values.Encode(); encoded != "" {
+			endpoint += "?" + encoded
+		}
+		var page CommentsPage
+		if err := c.getJSON(ctx, endpoint, &page); err != nil {
+			return err
+		}
+		for _, comment := range page.Comments {
+			if err := fn(comment); err != nil {
 				return err
 			}
 		}

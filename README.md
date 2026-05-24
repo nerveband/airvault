@@ -27,11 +27,36 @@ airvault backup create --out ./airtable-backup --format json
 airvault verify --path ./airtable-backup --format json
 ```
 
+Selective backup:
+
+```bash
+airvault backup create --base appXXXXXXXX --table Students --include schema,records --out ./students
+airvault backup create --exclude attachments --out ./metadata-records
+airvault backup create --include schema,records,attachments,comments,views --out ./full
+```
+
+Exports:
+
+```bash
+airvault export sqlite --path ./airtable-backup --out airtable.sqlite --overwrite
+airvault export postgres --path ./airtable-backup --out airtable.sql --overwrite
+airvault export jsonl --path ./airtable-backup --out ./jsonl --overwrite
+```
+
+Profiles and config:
+
+```bash
+airvault profile set --name personal --token-env AIRTABLE_TOKEN
+airvault config inspect --format json
+```
+
 ## Agent contract
 
 ```bash
 airvault schema
+airvault schema --validate
 airvault agent-context
+airvault skill-path
 ```
 
 Use `--format json` for deterministic output. Errors are structured on stderr in non-TTY or `AI_AGENT` contexts.

@@ -16,6 +16,7 @@ airvault bases list --format json
 airvault estimate --format json
 airvault backup create --out ./airtable-backup --format json
 airvault verify --path ./airtable-backup --format json
+airvault export sqlite --path ./airtable-backup --out airtable.sqlite --overwrite --format json
 ```
 
 Guardrails:
@@ -23,6 +24,8 @@ Guardrails:
 - Prefer `AIRTABLE_TOKEN`; avoid putting PATs in shell history with `--token`.
 - Run `estimate` before a large backup.
 - Run `verify` after every backup.
+- Use `--include`, `--exclude`, `--base`, and `--table` for selective backups.
+- Use `--deliver file:<path>` when a command should write result metadata atomically.
 - Rotate emergency Airtable PATs after use.
 - Treat `gap-report.json` as part of the backup; Airtable interfaces, automations, permissions, and extensions are not fully portable through public APIs.
 
@@ -30,5 +33,7 @@ Discovery:
 
 ```bash
 airvault schema --format json
+airvault schema --validate --format json
 airvault agent-context --format json
+airvault skill-path --format json
 ```

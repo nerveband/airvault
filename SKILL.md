@@ -15,9 +15,25 @@ Use `airvault` when you need to preserve Airtable data before a plan downgrade, 
 4. Run `airvault backup create --out ./airtable-backup --format json`.
 5. Run `airvault verify --path ./airtable-backup --format json`.
 
+Selective backups:
+
+```bash
+airvault backup create --base appXXXXXXXX --table Students --exclude attachments --out ./students
+airvault backup create --include schema,records,attachments,comments,views --out ./full
+```
+
+Exports:
+
+```bash
+airvault export sqlite --path ./airtable-backup --out airtable.sqlite --overwrite --format json
+airvault export postgres --path ./airtable-backup --out airtable.sql --overwrite --format json
+airvault export jsonl --path ./airtable-backup --out ./jsonl --overwrite --format json
+```
+
 ## Notes
 
 - Attachment URLs expire, so real backup runs download files immediately.
 - Linked records are preserved by Airtable record IDs.
 - Formula field definitions are preserved in schema metadata when Airtable exposes them, but formulas are not translated to other tools.
+- Comments are backed up only when `--include comments` is set and the token has the required scope.
 - Interfaces, automations, extensions, and permissions are reported in `gap-report.json` as unsupported surfaces.
