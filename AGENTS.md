@@ -127,6 +127,32 @@ Test all configured exporters:
 airvault test export --path ./airtable-backup --out /tmp/airvault-export-test --format json
 ```
 
+## Grist Import
+
+Plan an import without writing to Grist:
+
+```bash
+airvault import grist --path ./airtable-backup --dry-run --format json
+```
+
+Import into a local or self-hosted Grist server:
+
+```bash
+airvault import grist \
+  --path ./airtable-backup \
+  --url http://localhost:8484 \
+  --workspace 3 \
+  --api-key "$GRIST_API_KEY" \
+  --include-formulas \
+  --include-attachments \
+  --report grist-migration-report.json \
+  --format json
+```
+
+For a freshly bootstrapped local Grist server, a `GRIST_COOKIE` session cookie can be used for tests when an API key has not been created yet. Do not use fake Grist servers for importer validation; run the real `gristlabs/grist` container or Grist Desktop/server target and verify imported records through the Grist API.
+
+Formula translation is best-effort. The report lists each formula field with `translated` or `needs_review` status. Airtable functions with no direct Grist equivalent must be reviewed manually.
+
 ## Artifacts
 
 Important files inside an archive:

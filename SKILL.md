@@ -30,6 +30,13 @@ airvault export postgres --path ./airtable-backup --out airtable.sql --overwrite
 airvault export jsonl --path ./airtable-backup --out ./jsonl --overwrite --format json
 ```
 
+Grist import:
+
+```bash
+airvault import grist --path ./airtable-backup --dry-run --format json
+airvault import grist --path ./airtable-backup --url http://localhost:8484 --workspace 3 --api-key "$GRIST_API_KEY" --include-formulas --include-attachments --report grist-migration-report.json --format json
+```
+
 Testing:
 
 ```bash
@@ -52,7 +59,7 @@ airvault config set-defaults --backup-root ./airtable-backups --verify-mode exis
 
 - Attachment URLs expire, so real backup runs download files immediately.
 - Linked records are preserved by Airtable record IDs.
-- Formula field definitions are preserved in schema metadata when Airtable exposes them, but formulas are not translated to other tools.
+- Formula field definitions are preserved in schema metadata when Airtable exposes them. `import grist --include-formulas` translates simple formulas into Grist formula columns and reports formulas that need review.
 - Comments are backed up only when `--include comments` is set and the token has the required scope.
 - Interfaces, automations, extensions, and permissions are reported in `gap-report.json` as unsupported surfaces.
 - API restrictions and rate limits are reported in `api-telemetry.json`. Review it after live runs.

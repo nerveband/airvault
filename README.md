@@ -45,6 +45,23 @@ airvault export postgres --path ./airtable-backup --out airtable.sql --overwrite
 airvault export jsonl --path ./airtable-backup --out ./jsonl --overwrite
 ```
 
+Grist import:
+
+```bash
+airvault import grist --path ./airtable-backup --dry-run --format json
+airvault import grist \
+  --path ./airtable-backup \
+  --url http://localhost:8484 \
+  --workspace 3 \
+  --api-key "$GRIST_API_KEY" \
+  --include-formulas \
+  --include-attachments \
+  --report grist-migration-report.json \
+  --format json
+```
+
+For offline use, run Grist locally with Docker and a `/persist` volume, then import into that local server. Airtable formula fields are translated best-effort into Grist formula columns and reported in `formula_translations`; any uncertain translations are marked `needs_review`.
+
 Profiles and config:
 
 ```bash

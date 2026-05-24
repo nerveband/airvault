@@ -14,6 +14,7 @@ import (
 	"github.com/nerveband/airvault/internal/archive"
 	"github.com/nerveband/airvault/internal/config"
 	"github.com/nerveband/airvault/internal/exporter"
+	gristimport "github.com/nerveband/airvault/internal/importer/grist"
 	"github.com/nerveband/airvault/internal/output"
 	"github.com/nerveband/airvault/internal/update"
 	"github.com/spf13/cobra"
@@ -60,7 +61,7 @@ func root() *cobra.Command {
 	cmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Alias for --format json")
 	cmd.PersistentFlags().StringVar(&token, "token", "", "Airtable PAT (prefer AIRTABLE_TOKEN)")
 	cmd.PersistentFlags().StringVar(&profile, "profile", "", "Named profile from ~/.airvault/config.json")
-	cmd.AddCommand(versionCmd(), schemaCmd(), agentContextCmd(), skillPathCmd(), authCmd(), basesCmd(), estimateCmd(), backupCmd(), verifyCmd(), exportCmd(), testCmd(), profileCmd(), configCmd(), jobsCmd(), feedbackCmd(), upgradeCmd())
+	cmd.AddCommand(versionCmd(), schemaCmd(), agentContextCmd(), skillPathCmd(), authCmd(), basesCmd(), estimateCmd(), backupCmd(), verifyCmd(), exportCmd(), importCmd(), testCmd(), profileCmd(), configCmd(), jobsCmd(), feedbackCmd(), upgradeCmd())
 	return cmd
 }
 
@@ -356,6 +357,43 @@ func exportCmd() *cobra.Command {
 	cmd.Flags().StringVar(&deliver, "deliver", "", "Deliver result metadata to stdout or file:<path>")
 	cmd.Flags().BoolVar(&overwrite, "overwrite", false, "Overwrite existing output")
 	cmd.Flags().BoolVar(&plan, "plan", false, "Plan export without writing")
+	return cmd
+}
+
+func importCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "import", Short: "Import an airvault archive into another system"}
+	var path, url, apiKey, cookie, workspaceID, docID, report string
+	var dryRun, includeAttachments, includeFormulas bool
+	grist := &cobra.Command{Use: "grist", Short: "Import an archive into a local or self-hosted Grist server", Example: "  airvault import grist --path ./airtable-backup --dry-run --format json\n  airvault import grist --path ./airtable-backup --url http://localhost:8484 --workspace 3 --api-key $GRIST_API_KEY --include-formulas --include-attachments", RunE: func(cmd *cobra.Command, args []string) error {
+		if path == "" {
+			return &output.Error{Code: "VALIDATION_MISSING_PATH", Message: "--path is required", ExitCode: output.ExitValidation}
+		}
+		if apiKey == "" {
+			apiKey = os.Getenv("GRIST_API_KEY")
+		}
+		if cookie == "" {
+			cookie = os.Getenv("GRIST_COOKIE")
+		}
+		result, err := gristimport.Import(context.Background(), gristimport.Options{
+			ArchivePath: path, URL: url, APIKey: apiKey, Cookie: cookie, WorkspaceID: workspaceID, DocID: docID, DryRun: dryRun,
+			IncludeAttachments: includeAttachments, IncludeFormulas: includeFormulas, ReportPath: report,
+		})
+		if err != nil {
+			return &output.Error{Code: "IMPORT_FAILED", Message: err.Error(), ExitCode: output.ExitConflict}
+		}
+		return output.Write(cmd.OutOrStdout(), format, result, nil)
+	}}
+	grist.Flags().StringVar(&path, "path", "", "Archive path")
+	grist.Flags().StringVar(&url, "url", "", "Grist base URL, for example http://localhost:8484")
+	grist.Flags().StringVar(&apiKey, "api-key", "", "Grist API key; defaults to GRIST_API_KEY")
+	grist.Flags().StringVar(&cookie, "cookie", "", "Grist session cookie for local bootstrapped tests; defaults to GRIST_COOKIE")
+	grist.Flags().StringVar(&workspaceID, "workspace", "", "Grist workspace ID used when creating docs")
+	grist.Flags().StringVar(&docID, "doc", "", "Existing Grist doc ID; if set, imports all bases into this doc")
+	grist.Flags().StringVar(&report, "report", "", "Write migration report JSON to this path")
+	grist.Flags().BoolVar(&dryRun, "dry-run", false, "Plan import without contacting or writing to Grist")
+	grist.Flags().BoolVar(&includeAttachments, "include-attachments", false, "Upload local attachment files into Grist attachment columns")
+	grist.Flags().BoolVar(&includeFormulas, "include-formulas", false, "Create Grist formula columns from best-effort Airtable formula translations")
+	cmd.AddCommand(grist)
 	return cmd
 }
 
@@ -667,6 +705,7 @@ func commandSchema() map[string]any {
 			{"name": "backup create", "readonly": false, "destructive": false, "idempotent": true, "dry_run": true, "scope": "remote-read/local-write", "flags": []string{"--out", "--base", "--table", "--include", "--exclude", "--dry-run", "--no-attachments", "--max-attachment-bytes", "--resume-job"}},
 			{"name": "backup verify", "readonly": true, "idempotent": true, "flags": []string{"--path", "--mode", "--sample-size"}},
 			{"name": "export", "readonly": false, "destructive": false, "idempotent": true, "flags": []string{"--path", "--out", "--deliver", "--overwrite", "--plan"}},
+			{"name": "import grist", "readonly": false, "destructive": false, "idempotent": false, "dry_run": true, "scope": "local-read/grist-write", "flags": []string{"--path", "--url", "--api-key", "--cookie", "--workspace", "--doc", "--dry-run", "--include-attachments", "--include-formulas", "--report"}},
 			{"name": "test fixture", "readonly": false, "destructive": false, "idempotent": true, "flags": []string{"--out", "--overwrite"}},
 			{"name": "test verify", "readonly": true, "idempotent": true, "flags": []string{"--path", "--mode", "--sample-size"}},
 			{"name": "test export", "readonly": false, "destructive": false, "idempotent": true, "flags": []string{"--path", "--out", "--exporter"}},

@@ -45,7 +45,12 @@ func WriteFixture(path string) (*Manifest, error) {
 	if err := writeJSON(filepath.Join(baseDir, "base.json"), airtable.Base{ID: baseID, Name: "Fixture Base"}); err != nil {
 		return nil, err
 	}
-	schema := &airtable.Schema{Tables: []airtable.Table{{ID: tableID, Name: "Fixture Table", Fields: []airtable.Field{{ID: "fldName", Name: "Name", Type: "singleLineText"}, {ID: "fldFile", Name: "File", Type: "multipleAttachments"}}}}}
+	schema := &airtable.Schema{Tables: []airtable.Table{{ID: tableID, Name: "Fixture Table", Fields: []airtable.Field{
+		{ID: "fldName", Name: "Name", Type: "singleLineText"},
+		{ID: "fldScore", Name: "Score", Type: "number"},
+		{ID: "fldDouble", Name: "Double Score", Type: "formula", Options: map[string]any{"formula": "{Score} * 2"}},
+		{ID: "fldFile", Name: "File", Type: "multipleAttachments"},
+	}}}}
 	if err := writeJSON(filepath.Join(baseDir, "schema.json"), schema); err != nil {
 		return nil, err
 	}
@@ -58,7 +63,7 @@ func WriteFixture(path string) (*Manifest, error) {
 		return nil, err
 	}
 	for i := 1; i <= 2; i++ {
-		if err := writeJSONLine(records, airtable.Record{ID: fmt.Sprintf("recFixture%d", i), Fields: map[string]any{"fldName": fmt.Sprintf("Fixture %d", i)}}); err != nil {
+		if err := writeJSONLine(records, airtable.Record{ID: fmt.Sprintf("recFixture%d", i), Fields: map[string]any{"fldName": fmt.Sprintf("Fixture %d", i), "fldScore": i}}); err != nil {
 			records.Close()
 			return nil, err
 		}
