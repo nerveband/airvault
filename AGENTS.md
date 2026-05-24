@@ -1,0 +1,34 @@
+# airvault Agent Guide
+
+`airvault` creates local Airtable backup archives with schema, records, attachments, checksums, and gap reports.
+
+Auth:
+
+```bash
+export AIRTABLE_TOKEN=pat...
+airvault auth doctor --format json
+```
+
+Common workflows:
+
+```bash
+airvault bases list --format json
+airvault estimate --format json
+airvault backup create --out ./airtable-backup --format json
+airvault verify --path ./airtable-backup --format json
+```
+
+Guardrails:
+
+- Prefer `AIRTABLE_TOKEN`; avoid putting PATs in shell history with `--token`.
+- Run `estimate` before a large backup.
+- Run `verify` after every backup.
+- Rotate emergency Airtable PATs after use.
+- Treat `gap-report.json` as part of the backup; Airtable interfaces, automations, permissions, and extensions are not fully portable through public APIs.
+
+Discovery:
+
+```bash
+airvault schema --format json
+airvault agent-context --format json
+```
