@@ -13,7 +13,7 @@ Use `airvault` when you need to preserve Airtable data before a plan downgrade, 
 2. Run `airvault auth doctor --format json`.
 3. Run `airvault estimate --format json` to get record and attachment totals.
 4. Run `airvault backup create --out ./airtable-backup --format json`.
-5. Run `airvault verify --path ./airtable-backup --format json`.
+5. Run `airvault backup verify --path ./airtable-backup --mode exists --format json`.
 
 Selective backups:
 

@@ -26,7 +26,7 @@ airvault auth doctor
 airvault bases list
 airvault estimate --format json
 airvault backup create --out ./airtable-backup --format json
-airvault verify --path ./airtable-backup --format json
+airvault backup verify --path ./airtable-backup --mode exists --format json
 ```
 
 Selective backup:
