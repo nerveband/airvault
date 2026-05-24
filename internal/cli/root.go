@@ -51,7 +51,7 @@ func root() *cobra.Command {
 	cmd.PersistentFlags().StringVar(&format, "format", "auto", "Output format: auto, json, ndjson, table")
 	cmd.PersistentFlags().StringVar(&token, "token", "", "Airtable PAT (prefer AIRTABLE_TOKEN)")
 	cmd.PersistentFlags().StringVar(&profile, "profile", "", "Named profile from ~/.airvault/config.json")
-	cmd.AddCommand(versionCmd(), schemaCmd(), agentContextCmd(), skillPathCmd(), authCmd(), basesCmd(), estimateCmd(), backupCmd(), verifyCmd(), exportCmd(), profileCmd(), configCmd(), jobsCmd(), feedbackCmd(), upgradeCmd())
+	cmd.AddCommand(versionCmd(), schemaCmd(), agentContextCmd(), skillPathCmd(), authCmd(), basesCmd(), estimateCmd(), backupCmd(), verifyCmd(), exportCmd(), testCmd(), profileCmd(), configCmd(), jobsCmd(), feedbackCmd(), upgradeCmd())
 	return cmd
 }
 
@@ -310,6 +310,153 @@ func exportCmd() *cobra.Command {
 	return cmd
 }
 
+func testCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "test", Short: "Run backup integrity tests"}
+	var out string
+	var overwrite bool
+	fixture := &cobra.Command{Use: "fixture", Short: "Create a local fixture archive", Example: "  airvault test fixture --out /tmp/airvault-fixture --overwrite", RunE: func(cmd *cobra.Command, args []string) error {
+		if out == "" {
+			return &output.Error{Code: "VALIDATION_MISSING_OUT", Message: "--out is required", ExitCode: output.ExitValidation}
+		}
+		if overwrite {
+			if err := os.RemoveAll(out); err != nil {
+				return err
+			}
+		}
+		if _, err := os.Stat(out); err == nil {
+			return &output.Error{Code: "VALIDATION_OUTPUT_EXISTS", Message: out + " exists; pass --overwrite", ExitCode: output.ExitConflict}
+		}
+		m, err := archive.WriteFixture(out)
+		if err != nil {
+			return err
+		}
+		return output.Write(cmd.OutOrStdout(), format, map[string]any{"ok": true, "manifest": m}, nil)
+	}}
+	fixture.Flags().StringVar(&out, "out", "", "Fixture output directory")
+	fixture.Flags().BoolVar(&overwrite, "overwrite", false, "Replace existing fixture directory")
+	cmd.AddCommand(fixture)
+
+	var path string
+	verify := &cobra.Command{Use: "verify", Short: "Verify an archive and report integrity checks", Example: "  airvault test verify --path ./airtable-backup --format json", RunE: func(cmd *cobra.Command, args []string) error {
+		if path == "" {
+			return &output.Error{Code: "VALIDATION_MISSING_PATH", Message: "--path is required", ExitCode: output.ExitValidation}
+		}
+		m, err := archive.Verify(path)
+		if err != nil {
+			return &output.Error{Code: "TEST_VERIFY_FAILED", Message: err.Error(), ExitCode: output.ExitConflict}
+		}
+		report := map[string]any{
+			"ok":           true,
+			"archive_path": path,
+			"checks": map[string]bool{
+				"manifest":  fileExists(path + "/manifest.json"),
+				"checksums": fileExists(path + "/checksums.sha256"),
+				"jobs":      dirExists(path + "/jobs"),
+				"verify":    true,
+			},
+			"totals": m.Totals,
+		}
+		return output.Write(cmd.OutOrStdout(), format, report, nil)
+	}}
+	verify.Flags().StringVar(&path, "path", "", "Archive path")
+	cmd.AddCommand(verify)
+
+	var exportOut string
+	var exporters []string
+	exportTest := &cobra.Command{Use: "export", Short: "Test archive exports", Example: "  airvault test export --path ./airtable-backup --out /tmp/airvault-export-test --format json", RunE: func(cmd *cobra.Command, args []string) error {
+		if path == "" || exportOut == "" {
+			return &output.Error{Code: "VALIDATION_MISSING_INPUT", Message: "--path and --out are required", ExitCode: output.ExitValidation}
+		}
+		if len(exporters) == 0 {
+			exporters = []string{"jsonl", "sqlite", "postgres"}
+		}
+		results := []any{}
+		for _, name := range exporters {
+			e, err := exporter.Get(name)
+			if err != nil {
+				return &output.Error{Code: "VALIDATION_BAD_EXPORTER", Message: err.Error(), ExitCode: output.ExitValidation}
+			}
+			target := exportTarget(exportOut, name)
+			result, err := e.Export(context.Background(), exporter.Options{ArchivePath: path, Out: target, Overwrite: true})
+			if err != nil {
+				return &output.Error{Code: "TEST_EXPORT_FAILED", Message: err.Error(), ExitCode: output.ExitConflict}
+			}
+			results = append(results, result)
+		}
+		return output.Write(cmd.OutOrStdout(), format, map[string]any{"ok": true, "exports": results}, nil)
+	}}
+	exportTest.Flags().StringVar(&path, "path", "", "Archive path")
+	exportTest.Flags().StringVar(&exportOut, "out", "", "Export test output directory")
+	exportTest.Flags().StringSliceVar(&exporters, "exporter", nil, "Exporter to test; repeat or comma-separate")
+	cmd.AddCommand(exportTest)
+
+	full := &cobra.Command{Use: "full", Short: "Run full fixture-only integrity test", Example: "  airvault test full --out /tmp/airvault-test --overwrite --format json", RunE: func(cmd *cobra.Command, args []string) error {
+		if out == "" {
+			return &output.Error{Code: "VALIDATION_MISSING_OUT", Message: "--out is required", ExitCode: output.ExitValidation}
+		}
+		if overwrite {
+			if err := os.RemoveAll(out); err != nil {
+				return err
+			}
+		}
+		fixtureDir := out + "/fixture"
+		exportDir := out + "/exports"
+		if _, err := archive.WriteFixture(fixtureDir); err != nil {
+			return err
+		}
+		m, err := archive.Verify(fixtureDir)
+		if err != nil {
+			return err
+		}
+		exportResults := []any{}
+		for _, name := range []string{"jsonl", "sqlite", "postgres"} {
+			e, err := exporter.Get(name)
+			if err != nil {
+				return err
+			}
+			result, err := e.Export(context.Background(), exporter.Options{ArchivePath: fixtureDir, Out: exportTarget(exportDir, name), Overwrite: true})
+			if err != nil {
+				return err
+			}
+			exportResults = append(exportResults, result)
+		}
+		return output.Write(cmd.OutOrStdout(), format, map[string]any{
+			"ok":           true,
+			"archive_path": fixtureDir,
+			"checks":       map[string]bool{"fixture": true, "verify": true, "exports": true},
+			"totals":       m.Totals,
+			"exports":      exportResults,
+		}, nil)
+	}}
+	full.Flags().StringVar(&out, "out", "", "Test output directory")
+	full.Flags().BoolVar(&overwrite, "overwrite", false, "Replace existing test output")
+	cmd.AddCommand(full)
+	return cmd
+}
+
+func exportTarget(root, name string) string {
+	switch name {
+	case "sqlite":
+		return root + "/airvault.sqlite"
+	case "postgres":
+		return root + "/airvault.sql"
+	case "jsonl":
+		return root + "/jsonl"
+	default:
+		return root + "/" + name
+	}
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+func dirExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
+}
+
 func profileCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "profile", Short: "Manage named profiles"}
 	cmd.AddCommand(&cobra.Command{Use: "list", Short: "List profiles", Example: "  airvault profile list --format json", RunE: func(cmd *cobra.Command, args []string) error {
@@ -417,6 +564,10 @@ func commandSchema() map[string]any {
 			{"name": "backup create", "readonly": false, "destructive": false, "idempotent": true, "dry_run": true, "scope": "remote-read/local-write", "flags": []string{"--out", "--base", "--table", "--include", "--exclude", "--dry-run", "--no-attachments", "--max-attachment-bytes", "--resume-job"}},
 			{"name": "backup verify", "readonly": true, "idempotent": true, "flags": []string{"--path"}},
 			{"name": "export", "readonly": false, "destructive": false, "idempotent": true, "flags": []string{"--path", "--out", "--deliver", "--overwrite", "--plan"}},
+			{"name": "test fixture", "readonly": false, "destructive": false, "idempotent": true, "flags": []string{"--out", "--overwrite"}},
+			{"name": "test verify", "readonly": true, "idempotent": true, "flags": []string{"--path"}},
+			{"name": "test export", "readonly": false, "destructive": false, "idempotent": true, "flags": []string{"--path", "--out", "--exporter"}},
+			{"name": "test full", "readonly": false, "destructive": false, "idempotent": true, "flags": []string{"--out", "--overwrite"}},
 			{"name": "profile list", "readonly": true, "idempotent": true},
 			{"name": "profile set", "readonly": false, "idempotent": true, "flags": []string{"--name", "--token-env", "--token-value"}},
 		},

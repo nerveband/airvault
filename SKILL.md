@@ -30,6 +30,14 @@ airvault export postgres --path ./airtable-backup --out airtable.sql --overwrite
 airvault export jsonl --path ./airtable-backup --out ./jsonl --overwrite --format json
 ```
 
+Testing:
+
+```bash
+airvault test full --out /tmp/airvault-test --overwrite --format json
+airvault test verify --path ./airtable-backup --format json
+airvault test export --path ./airtable-backup --out /tmp/airvault-export-test --format json
+```
+
 ## Notes
 
 - Attachment URLs expire, so real backup runs download files immediately.

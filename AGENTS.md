@@ -17,6 +17,7 @@ airvault estimate --format json
 airvault backup create --out ./airtable-backup --format json
 airvault verify --path ./airtable-backup --format json
 airvault export sqlite --path ./airtable-backup --out airtable.sqlite --overwrite --format json
+airvault test full --out /tmp/airvault-test --overwrite --format json
 ```
 
 Guardrails:
@@ -26,6 +27,7 @@ Guardrails:
 - Run `verify` after every backup.
 - Use `--include`, `--exclude`, `--base`, and `--table` for selective backups.
 - Use `--deliver file:<path>` when a command should write result metadata atomically.
+- Use `airvault test full` for fixture-only validation before relying on live backups.
 - Rotate emergency Airtable PATs after use.
 - Treat `gap-report.json` as part of the backup; Airtable interfaces, automations, permissions, and extensions are not fully portable through public APIs.
 

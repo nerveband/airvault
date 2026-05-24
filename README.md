@@ -50,6 +50,14 @@ airvault profile set --name personal --token-env AIRTABLE_TOKEN
 airvault config inspect --format json
 ```
 
+Backup testing:
+
+```bash
+airvault test full --out /tmp/airvault-test --overwrite --format json
+airvault test verify --path ./airtable-backup --format json
+airvault test export --path ./airtable-backup --out /tmp/airvault-export-test --format json
+```
+
 ## Agent contract
 
 ```bash
