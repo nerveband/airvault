@@ -145,7 +145,7 @@ func (c *Client) CreateTable(ctx context.Context, baseID string, table airtable.
 	fieldNames := nocoFieldNames(table)
 	for _, field := range table.Fields {
 		name := fieldNames[field.ID]
-		columns = append(columns, map[string]any{"title": name, "column_name": name, "uidt": nocoType(field)})
+		columns = append(columns, nocoColumn(field, name))
 	}
 	var out struct {
 		ID string `json:"id"`
@@ -155,6 +155,14 @@ func (c *Client) CreateTable(ctx context.Context, baseID string, table airtable.
 		return "", err
 	}
 	return out.ID, nil
+}
+
+func nocoColumn(field airtable.Field, name string) map[string]any {
+	column := map[string]any{"title": name, "column_name": name, "uidt": nocoType(field)}
+	if field.Type == "singleSelect" || field.Type == "multipleSelects" {
+		column["colOptions"] = map[string]any{"options": nocoSelectOptions(field)}
+	}
+	return column
 }
 
 func (c *Client) InsertRowsBatched(ctx context.Context, tableID string, rows []map[string]any, batchSize int) error {
@@ -176,13 +184,35 @@ func (c *Client) InsertRowsBatched(ctx context.Context, tableID string, rows []m
 
 func nocoType(field airtable.Field) string {
 	switch field.Type {
-	case "number", "currency", "percent", "rating", "duration", "count":
+	case "number", "count", "autoNumber":
 		return "Number"
+	case "currency":
+		return "Currency"
+	case "percent":
+		return "Percent"
+	case "rating":
+		return "Rating"
+	case "duration":
+		return "Duration"
 	case "checkbox":
 		return "Checkbox"
-	case "date", "dateTime", "createdTime", "lastModifiedTime":
+	case "date":
+		return "Date"
+	case "dateTime", "createdTime", "lastModifiedTime":
 		return "DateTime"
-	case "multilineText", "richText", "multipleAttachments", "multipleRecordLinks", "multipleSelects":
+	case "email":
+		return "Email"
+	case "url":
+		return "URL"
+	case "phoneNumber":
+		return "PhoneNumber"
+	case "singleSelect":
+		return "SingleSelect"
+	case "multipleSelects":
+		return "MultiSelect"
+	case "multipleAttachments":
+		return "Attachment"
+	case "multilineText", "richText", "multipleRecordLinks", "multipleCollaborators", "createdBy", "lastModifiedBy", "externalSyncSource":
 		return "LongText"
 	default:
 		return "SingleLineText"
@@ -195,9 +225,34 @@ func convertRows(table airtable.Table, rows []airtable.Record) []map[string]any 
 	for _, row := range rows {
 		next := map[string]any{"Airtable Record ID": row.ID}
 		for _, field := range table.Fields {
-			next[fieldNames[field.ID]] = value(row.Fields[field.ID])
+			if v := nocoValue(field, row.Fields[field.ID]); v != nil {
+				next[fieldNames[field.ID]] = v
+			}
 		}
 		out = append(out, next)
+	}
+	return out
+}
+
+func nocoSelectOptions(field airtable.Field) []map[string]any {
+	var out []map[string]any
+	if field.Options == nil {
+		return out
+	}
+	choices, ok := field.Options["choices"].([]any)
+	if !ok {
+		return out
+	}
+	for _, raw := range choices {
+		choice, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		name, _ := choice["name"].(string)
+		if name == "" {
+			continue
+		}
+		out = append(out, map[string]any{"title": name})
 	}
 	return out
 }
@@ -250,6 +305,13 @@ func nocoColumnKey(name string) string {
 	return strings.Trim(key, "_")
 }
 
+func nocoValue(field airtable.Field, v any) any {
+	if field.Type == "multipleSelects" {
+		return strings.Join(toStrings(v), ",")
+	}
+	return value(v)
+}
+
 func value(v any) any {
 	switch v.(type) {
 	case nil, string, bool, float64, int, int64, json.Number:
@@ -257,6 +319,23 @@ func value(v any) any {
 	default:
 		return common.Stringify(v)
 	}
+}
+
+func toStrings(v any) []string {
+	items, ok := v.([]any)
+	if !ok {
+		if s, ok := v.(string); ok && s != "" {
+			return []string{s}
+		}
+		return nil
+	}
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		if s, ok := item.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 func (c *Client) doJSON(ctx context.Context, method, path string, payload any, out any) error {

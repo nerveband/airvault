@@ -65,13 +65,13 @@ Baserow must be accessed through the configured public URL host for this local s
 http://192.168.1.5:8081
 ```
 
-The archive import completed successfully against the real Baserow container with:
+The typed archive import completed successfully against the real Baserow container with:
 
 ```json
 {"bases":46,"tables":149,"records":10387}
 ```
 
-This is good for visual comparison, but it is not a perfect Airtable clone because Airtable views, formulas, interfaces, automations, comments, permissions, and attachment binary fields are not one-to-one portable.
+Supported Airtable field types are explicitly mapped to Baserow field types. Invalid target-specific values, such as malformed URLs, malformed emails, invalid phone numbers, blank select values, and over-precise numbers, are normalized or omitted rather than aborting the import. This is good for visual comparison, but it is not a perfect Airtable clone because Airtable views, formulas, interfaces, automations, comments, permissions, and exact formula semantics are not one-to-one portable.
 
 ## Verification
 
@@ -102,5 +102,5 @@ Expected full archive counts:
 Current successful full import report:
 
 ```text
-/Volumes/SHAMS M1/wavedepth Dropbox/Ashraf Ali/Mac (2)/Documents/Projects/personal-stuff/ashraf-airtable-backup/reports/baserow-import-2026-05-24_211645.json
+/Volumes/SHAMS M1/wavedepth Dropbox/Ashraf Ali/Mac (2)/Documents/Projects/personal-stuff/ashraf-airtable-backup/reports/baserow-import-typed-2026-05-24_222800.json
 ```

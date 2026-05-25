@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/nerveband/airvault/internal/airtable"
@@ -116,6 +117,42 @@ func TestNocoFieldNamesAvoidReservedAndDuplicateNames(t *testing.T) {
 	got := nocoFieldNames(table)
 	if got["fld0"] != "ID Field" || got["fld1"] != "ID Field 2" || got["fld2"] != "CreatedAt Field" || got["fld3"] != "Created At Field" || got["fld4"] != "Created By Field" {
 		t.Fatalf("unexpected names: %+v", got)
+	}
+}
+
+func TestNocoTypeMapping(t *testing.T) {
+	tests := map[string]string{
+		"singleLineText":      "SingleLineText",
+		"multilineText":       "LongText",
+		"richText":            "LongText",
+		"url":                 "URL",
+		"email":               "Email",
+		"phoneNumber":         "PhoneNumber",
+		"number":              "Number",
+		"currency":            "Currency",
+		"percent":             "Percent",
+		"rating":              "Rating",
+		"checkbox":            "Checkbox",
+		"date":                "Date",
+		"dateTime":            "DateTime",
+		"duration":            "Duration",
+		"singleSelect":        "SingleSelect",
+		"multipleSelects":     "MultiSelect",
+		"multipleAttachments": "Attachment",
+	}
+	for airtableType, want := range tests {
+		if got := nocoType(airtable.Field{Type: airtableType}); got != want {
+			t.Fatalf("%s mapped to %s, want %s", airtableType, got, want)
+		}
+	}
+}
+
+func TestNocoColumnIncludesSelectOptions(t *testing.T) {
+	field := airtable.Field{Name: "Status", Type: "singleSelect", Options: map[string]any{"choices": []any{map[string]any{"name": "Both"}}}}
+	column := nocoColumn(field, field.Name)
+	encoded, _ := json.Marshal(column["colOptions"])
+	if !strings.Contains(string(encoded), "Both") {
+		t.Fatalf("expected select option in column: %+v", column)
 	}
 }
 

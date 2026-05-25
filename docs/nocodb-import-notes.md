@@ -68,6 +68,8 @@ airvault import nocodb \
 
 NocoDB rejects some base-name characters that Airtable allows. The importer sanitizes base names to characters accepted by NocoDB.
 
+Supported Airtable field types are explicitly mapped to NocoDB field types. Select choices are copied into NocoDB `colOptions` before rows are inserted.
+
 NocoDB creates system/storage columns and normalizes field names internally. The importer avoids conflicts with reserved or normalized names like:
 
 ```text
@@ -113,5 +115,5 @@ Expected full archive counts:
 Current successful full import report:
 
 ```text
-/Volumes/SHAMS M1/wavedepth Dropbox/Ashraf Ali/Mac (2)/Documents/Projects/personal-stuff/ashraf-airtable-backup/reports/nocodb-import-2026-05-24_212313.json
+/Volumes/SHAMS M1/wavedepth Dropbox/Ashraf Ali/Mac (2)/Documents/Projects/personal-stuff/ashraf-airtable-backup/reports/nocodb-import-typed-2026-05-24_215900.json
 ```

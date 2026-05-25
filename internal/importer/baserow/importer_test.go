@@ -6,8 +6,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/nerveband/airvault/internal/airtable"
 	"github.com/nerveband/airvault/internal/archive"
 )
 
@@ -44,10 +46,33 @@ func TestImportCreatesDatabaseAndTable(t *testing.T) {
 			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 				t.Fatal(err)
 			}
-			if payload.Name != "Fixture Table" || len(payload.Data) != 3 || payload.Data[1][0] != "recFixture1" {
+			if payload.Name != "Fixture Table" || len(payload.Data) != 1 || payload.Data[0][0] != "Airtable Record ID" {
 				t.Fatalf("unexpected payload: %+v", payload)
 			}
 			writeJSON(t, w, map[string]any{"id": 11})
+		case "/api/database/fields/table/11/":
+			var payload map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				t.Fatal(err)
+			}
+			if payload["name"] == "Score" && payload["type"] != "number" {
+				t.Fatalf("Score should be number: %+v", payload)
+			}
+			writeJSON(t, w, map[string]any{"id": 12})
+		case "/api/database/rows/table/11/batch/":
+			if r.URL.Query().Get("user_field_names") != "true" {
+				t.Fatalf("missing user_field_names=true")
+			}
+			var payload struct {
+				Items []map[string]any `json:"items"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				t.Fatal(err)
+			}
+			if len(payload.Items) != 2 || payload.Items[0]["Airtable Record ID"] != "recFixture1" {
+				t.Fatalf("unexpected rows: %+v", payload)
+			}
+			writeJSON(t, w, map[string]any{"items": []any{}})
 		default:
 			http.NotFound(w, r)
 		}
@@ -64,6 +89,11 @@ func TestImportCreatesDatabaseAndTable(t *testing.T) {
 	want := []string{
 		"POST /api/applications/workspace/7/",
 		"POST /api/database/tables/database/10/",
+		"POST /api/database/fields/table/11/",
+		"POST /api/database/fields/table/11/",
+		"POST /api/database/fields/table/11/",
+		"POST /api/database/fields/table/11/",
+		"POST /api/database/rows/table/11/batch/",
 	}
 	if len(paths) != len(want) {
 		t.Fatalf("paths = %+v, want %+v", paths, want)
@@ -72,6 +102,41 @@ func TestImportCreatesDatabaseAndTable(t *testing.T) {
 		if paths[i] != want[i] {
 			t.Fatalf("paths = %+v, want %+v", paths, want)
 		}
+	}
+}
+
+func TestBaserowTypeMapping(t *testing.T) {
+	tests := map[string]string{
+		"singleLineText":      "text",
+		"multilineText":       "long_text",
+		"richText":            "long_text",
+		"url":                 "url",
+		"email":               "email",
+		"phoneNumber":         "phone_number",
+		"number":              "number",
+		"currency":            "number",
+		"percent":             "number",
+		"rating":              "rating",
+		"checkbox":            "boolean",
+		"date":                "date",
+		"dateTime":            "date",
+		"duration":            "duration",
+		"singleSelect":        "single_select",
+		"multipleSelects":     "multiple_select",
+		"multipleAttachments": "file",
+	}
+	for airtableType, want := range tests {
+		if got := baserowType(airtable.Field{Type: airtableType}); got != want {
+			t.Fatalf("%s mapped to %s, want %s", airtableType, got, want)
+		}
+	}
+}
+
+func TestBaserowFieldPayloadIncludesSelectOptions(t *testing.T) {
+	field := airtable.Field{Name: "Status", Type: "singleSelect", Options: map[string]any{"choices": []any{map[string]any{"name": "Todo"}}}}
+	payload := baserowFieldPayload(field, field.Name)
+	if payload["type"] != "single_select" || !strings.Contains(commonJSON(payload["select_options"]), "Todo") {
+		t.Fatalf("unexpected select payload: %+v", payload)
 	}
 }
 
@@ -98,4 +163,9 @@ func writeJSON(t *testing.T, w http.ResponseWriter, v any) {
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func commonJSON(v any) string {
+	data, _ := json.Marshal(v)
+	return string(data)
 }

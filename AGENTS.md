@@ -219,8 +219,8 @@ docs/baserow-import-notes.md
 Current archive import reports:
 
 ```text
-NocoDB: /Volumes/SHAMS M1/wavedepth Dropbox/Ashraf Ali/Mac (2)/Documents/Projects/personal-stuff/ashraf-airtable-backup/reports/nocodb-import-2026-05-24_212313.json
-Baserow: /Volumes/SHAMS M1/wavedepth Dropbox/Ashraf Ali/Mac (2)/Documents/Projects/personal-stuff/ashraf-airtable-backup/reports/baserow-import-2026-05-24_211645.json
+NocoDB: /Volumes/SHAMS M1/wavedepth Dropbox/Ashraf Ali/Mac (2)/Documents/Projects/personal-stuff/ashraf-airtable-backup/reports/nocodb-import-typed-2026-05-24_215900.json
+Baserow: /Volumes/SHAMS M1/wavedepth Dropbox/Ashraf Ali/Mac (2)/Documents/Projects/personal-stuff/ashraf-airtable-backup/reports/baserow-import-typed-2026-05-24_222800.json
 ```
 
 ## Artifacts

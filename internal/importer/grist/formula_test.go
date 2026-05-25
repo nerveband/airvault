@@ -1,6 +1,10 @@
 package grist
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/nerveband/airvault/internal/airtable"
+)
 
 func TestTranslateFormulaFieldReferences(t *testing.T) {
 	got := TranslateFormula("{Score} * 2", map[string]string{"Score": "Score"})
@@ -19,5 +23,31 @@ func TestTranslateFormulaWarnsForLossyAirtableFunctions(t *testing.T) {
 	}
 	if len(got.Warnings) == 0 {
 		t.Fatal("expected warning")
+	}
+}
+
+func TestGristTypeMapping(t *testing.T) {
+	tests := map[string]string{
+		"singleLineText":      "Text",
+		"multilineText":       "Text",
+		"url":                 "Text",
+		"email":               "Text",
+		"phoneNumber":         "Text",
+		"number":              "Numeric",
+		"currency":            "Numeric",
+		"percent":             "Numeric",
+		"rating":              "Numeric",
+		"checkbox":            "Bool",
+		"date":                "Date",
+		"dateTime":            "DateTime",
+		"duration":            "Numeric",
+		"singleSelect":        "Choice",
+		"multipleSelects":     "ChoiceList",
+		"multipleAttachments": "Attachments",
+	}
+	for airtableType, want := range tests {
+		if got := gristType(airtable.Field{Type: airtableType}); got != want {
+			t.Fatalf("%s mapped to %s, want %s", airtableType, got, want)
+		}
 	}
 }
