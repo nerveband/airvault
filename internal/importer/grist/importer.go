@@ -152,7 +152,7 @@ func Import(ctx context.Context, opts Options) (*Report, error) {
 				records = append(records, convertRecord(row, table, fieldIDsByName, attachmentCells[row.ID]))
 			}
 			if len(records) > 0 && !opts.DryRun {
-				if err := client.AddRecords(ctx, docID, tableID, records); err != nil {
+				if err := client.AddRecordsBatched(ctx, docID, tableID, records, 25); err != nil {
 					return nil, err
 				}
 			}
@@ -228,6 +228,9 @@ func fieldSlugMap(table airtable.Table) map[string]string {
 	out := map[string]string{}
 	for _, field := range table.Fields {
 		base := slug(field.Name)
+		if reservedColumnID(base) {
+			base += "_Field"
+		}
 		id := base
 		if used[base] > 0 {
 			id = base + "_" + strconv.Itoa(used[base]+1)
@@ -237,6 +240,15 @@ func fieldSlugMap(table airtable.Table) map[string]string {
 		out[field.ID] = id
 	}
 	return out
+}
+
+func reservedColumnID(id string) bool {
+	switch strings.ToLower(id) {
+	case "id", "manualsort":
+		return true
+	default:
+		return false
+	}
 }
 
 func convertRecord(rec airtable.Record, table airtable.Table, fieldIDsByName map[string]string, attachments map[string][]int) map[string]any {
@@ -254,9 +266,46 @@ func convertRecord(rec airtable.Record, table airtable.Table, fieldIDsByName map
 			fields[id] = stringify(rec.Fields[field.ID])
 			continue
 		}
-		fields[id] = rec.Fields[field.ID]
+		fields[id] = gristValue(field, rec.Fields[field.ID])
 	}
 	return fields
+}
+
+func gristValue(field airtable.Field, value any) any {
+	if value == nil {
+		return nil
+	}
+	switch field.Type {
+	case "multipleSelects":
+		return choiceList(value)
+	case "multipleCollaborators", "createdBy", "lastModifiedBy", "externalSyncSource":
+		return stringify(value)
+	}
+	switch value.(type) {
+	case string, bool, float64, int, int64, json.Number:
+		return value
+	case []any, map[string]any:
+		return stringify(value)
+	default:
+		return value
+	}
+}
+
+func choiceList(value any) any {
+	items, ok := value.([]any)
+	if !ok {
+		return stringify(value)
+	}
+	out := []any{"L"}
+	for _, item := range items {
+		switch v := item.(type) {
+		case string:
+			out = append(out, v)
+		default:
+			out = append(out, fmt.Sprint(v))
+		}
+	}
+	return out
 }
 
 func intSliceToAny(ids []int) []any {
@@ -376,6 +425,22 @@ func (c *Client) AddRecords(ctx context.Context, docID, tableID string, records 
 	return c.doJSON(ctx, http.MethodPost, "/api/docs/"+url.PathEscape(docID)+"/tables/"+url.PathEscape(tableID)+"/records", payload, nil)
 }
 
+func (c *Client) AddRecordsBatched(ctx context.Context, docID, tableID string, records []map[string]any, batchSize int) error {
+	if batchSize <= 0 {
+		batchSize = 25
+	}
+	for start := 0; start < len(records); start += batchSize {
+		end := start + batchSize
+		if end > len(records) {
+			end = len(records)
+		}
+		if err := c.AddRecords(ctx, docID, tableID, records[start:end]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (c *Client) UploadAttachment(ctx context.Context, docID, path string) (int, error) {
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
@@ -472,8 +537,8 @@ func slug(name string) string {
 	if out == "" {
 		return "Imported"
 	}
-	if out[0] >= '0' && out[0] <= '9' {
-		out = "_" + out
+	if (out[0] < 'A' || out[0] > 'Z') && (out[0] < 'a' || out[0] > 'z') {
+		out = "C_" + out
 	}
 	return out
 }
