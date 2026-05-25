@@ -153,6 +153,76 @@ For a freshly bootstrapped local Grist server, a `GRIST_COOKIE` session cookie c
 
 Formula translation is best-effort. The report lists each formula field with `translated` or `needs_review` status. Airtable functions with no direct Grist equivalent must be reviewed manually.
 
+## Current Local Grist
+
+The imported offline Grist instance is running in Docker/Colima:
+
+```text
+Container: airvault-grist-test
+Primary LAN URL: http://192.168.1.5:8484
+Fallback LAN URL: http://192.168.1.58:8484
+Boot key: airvault-boot-key
+Admin email: airvault@example.com
+Workspace ID: 3
+```
+
+The LAN URLs are also saved in `.env`. On Grist's quick setup screen, use `http://192.168.1.5:8484` as the Base URL, click `Test URL`, click `Confirm edition`, then continue through the setup. Choose `Full Grist` unless the user asks for Community Edition; it can run locally and gives the 30-day activation path shown by Grist.
+
+Current full import report:
+
+```text
+/Volumes/SHAMS M1/wavedepth Dropbox/Ashraf Ali/Mac (2)/Documents/Projects/personal-stuff/ashraf-airtable-backup/reports/grist-import-2026-05-24_202726.json
+```
+
+## Current NocoDB And Baserow Comparison
+
+The user decided to stop using Grist for comparison and evaluate NocoDB and Baserow side by side. Grist was stopped after the successful import; do not restart it unless asked.
+
+Running containers:
+
+```text
+NocoDB: airvault-nocodb
+Baserow: airvault-baserow
+```
+
+LAN URLs:
+
+```text
+NocoDB: http://192.168.1.5:8080
+Baserow: http://192.168.1.5:8081
+```
+
+Local comparison login:
+
+```text
+Email: airvault@example.com
+Password: airvault-local-2026
+```
+
+Baserow is configured with `BASEROW_PUBLIC_URL=http://192.168.1.5:8081`, so use the `192.168.1.5` URL from browsers. `localhost` or `192.168.1.58` can hit Baserow's builder-domain fallback and return 404.
+
+NocoDB is configured with `NC_PUBLIC_URL=http://192.168.1.5:8080`; prefer the primary LAN URL there too.
+
+Native Airtable import notes:
+
+- NocoDB requires a valid Airtable PAT and shared base ID/URL.
+- Baserow requires a public Airtable base share link and imports one base at a time.
+- Prefer archive-based imports from the local `airvault` backup if live Airtable/share links are unavailable.
+
+Keep target-specific import learnings in:
+
+```text
+docs/nocodb-import-notes.md
+docs/baserow-import-notes.md
+```
+
+Current archive import reports:
+
+```text
+NocoDB: /Volumes/SHAMS M1/wavedepth Dropbox/Ashraf Ali/Mac (2)/Documents/Projects/personal-stuff/ashraf-airtable-backup/reports/nocodb-import-2026-05-24_212313.json
+Baserow: /Volumes/SHAMS M1/wavedepth Dropbox/Ashraf Ali/Mac (2)/Documents/Projects/personal-stuff/ashraf-airtable-backup/reports/baserow-import-2026-05-24_211645.json
+```
+
 ## Artifacts
 
 Important files inside an archive:

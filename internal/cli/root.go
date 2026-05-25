@@ -14,7 +14,9 @@ import (
 	"github.com/nerveband/airvault/internal/archive"
 	"github.com/nerveband/airvault/internal/config"
 	"github.com/nerveband/airvault/internal/exporter"
+	baserowimport "github.com/nerveband/airvault/internal/importer/baserow"
 	gristimport "github.com/nerveband/airvault/internal/importer/grist"
+	nocodbimport "github.com/nerveband/airvault/internal/importer/nocodb"
 	"github.com/nerveband/airvault/internal/output"
 	"github.com/nerveband/airvault/internal/update"
 	"github.com/spf13/cobra"
@@ -394,6 +396,50 @@ func importCmd() *cobra.Command {
 	grist.Flags().BoolVar(&includeAttachments, "include-attachments", false, "Upload local attachment files into Grist attachment columns")
 	grist.Flags().BoolVar(&includeFormulas, "include-formulas", false, "Create Grist formula columns from best-effort Airtable formula translations")
 	cmd.AddCommand(grist)
+
+	var nocoURL, nocoToken string
+	var nocoBatchSize int
+	nocodb := &cobra.Command{Use: "nocodb", Short: "Import an archive into a local or self-hosted NocoDB server", Example: "  airvault import nocodb --path ./airtable-backup --dry-run --format json\n  airvault import nocodb --path ./airtable-backup --url http://localhost:8080 --token $NOCODB_TOKEN --format json", RunE: func(cmd *cobra.Command, args []string) error {
+		if path == "" {
+			return &output.Error{Code: "VALIDATION_MISSING_PATH", Message: "--path is required", ExitCode: output.ExitValidation}
+		}
+		if nocoToken == "" {
+			nocoToken = os.Getenv("NOCODB_TOKEN")
+		}
+		result, err := nocodbimport.Import(context.Background(), nocodbimport.Options{ArchivePath: path, URL: nocoURL, Token: nocoToken, DryRun: dryRun, BatchSize: nocoBatchSize})
+		if err != nil {
+			return &output.Error{Code: "IMPORT_FAILED", Message: err.Error(), ExitCode: output.ExitConflict}
+		}
+		return output.Write(cmd.OutOrStdout(), format, result, nil)
+	}}
+	nocodb.Flags().StringVar(&path, "path", "", "Archive path")
+	nocodb.Flags().StringVar(&nocoURL, "url", "", "NocoDB base URL, for example http://localhost:8080")
+	nocodb.Flags().StringVar(&nocoToken, "token", "", "NocoDB auth token; defaults to NOCODB_TOKEN")
+	nocodb.Flags().BoolVar(&dryRun, "dry-run", false, "Plan import without contacting or writing to NocoDB")
+	nocodb.Flags().IntVar(&nocoBatchSize, "batch-size", 100, "Rows per NocoDB insert batch")
+	cmd.AddCommand(nocodb)
+
+	var baserowURL, baserowToken string
+	var baserowWorkspace int
+	baserow := &cobra.Command{Use: "baserow", Short: "Import an archive into a local or self-hosted Baserow server", Example: "  airvault import baserow --path ./airtable-backup --dry-run --format json\n  airvault import baserow --path ./airtable-backup --url http://localhost:8081 --token $BASEROW_TOKEN --workspace 1 --format json", RunE: func(cmd *cobra.Command, args []string) error {
+		if path == "" {
+			return &output.Error{Code: "VALIDATION_MISSING_PATH", Message: "--path is required", ExitCode: output.ExitValidation}
+		}
+		if baserowToken == "" {
+			baserowToken = os.Getenv("BASEROW_TOKEN")
+		}
+		result, err := baserowimport.Import(context.Background(), baserowimport.Options{ArchivePath: path, URL: baserowURL, Token: baserowToken, WorkspaceID: baserowWorkspace, DryRun: dryRun})
+		if err != nil {
+			return &output.Error{Code: "IMPORT_FAILED", Message: err.Error(), ExitCode: output.ExitConflict}
+		}
+		return output.Write(cmd.OutOrStdout(), format, result, nil)
+	}}
+	baserow.Flags().StringVar(&path, "path", "", "Archive path")
+	baserow.Flags().StringVar(&baserowURL, "url", "", "Baserow base URL, for example http://localhost:8081")
+	baserow.Flags().StringVar(&baserowToken, "token", "", "Baserow JWT token; defaults to BASEROW_TOKEN")
+	baserow.Flags().IntVar(&baserowWorkspace, "workspace", 0, "Baserow workspace ID")
+	baserow.Flags().BoolVar(&dryRun, "dry-run", false, "Plan import without contacting or writing to Baserow")
+	cmd.AddCommand(baserow)
 	return cmd
 }
 
@@ -706,6 +752,8 @@ func commandSchema() map[string]any {
 			{"name": "backup verify", "readonly": true, "idempotent": true, "flags": []string{"--path", "--mode", "--sample-size"}},
 			{"name": "export", "readonly": false, "destructive": false, "idempotent": true, "flags": []string{"--path", "--out", "--deliver", "--overwrite", "--plan"}},
 			{"name": "import grist", "readonly": false, "destructive": false, "idempotent": false, "dry_run": true, "scope": "local-read/grist-write", "flags": []string{"--path", "--url", "--api-key", "--cookie", "--workspace", "--doc", "--dry-run", "--include-attachments", "--include-formulas", "--report"}},
+			{"name": "import nocodb", "readonly": false, "destructive": false, "idempotent": false, "dry_run": true, "scope": "local-read/nocodb-write", "flags": []string{"--path", "--url", "--token", "--dry-run", "--batch-size"}},
+			{"name": "import baserow", "readonly": false, "destructive": false, "idempotent": false, "dry_run": true, "scope": "local-read/baserow-write", "flags": []string{"--path", "--url", "--token", "--workspace", "--dry-run"}},
 			{"name": "test fixture", "readonly": false, "destructive": false, "idempotent": true, "flags": []string{"--out", "--overwrite"}},
 			{"name": "test verify", "readonly": true, "idempotent": true, "flags": []string{"--path", "--mode", "--sample-size"}},
 			{"name": "test export", "readonly": false, "destructive": false, "idempotent": true, "flags": []string{"--path", "--out", "--exporter"}},

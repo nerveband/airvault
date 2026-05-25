@@ -62,6 +62,27 @@ airvault import grist \
 
 For offline use, run Grist locally with Docker and a `/persist` volume, then import into that local server. Airtable formula fields are translated best-effort into Grist formula columns and reported in `formula_translations`; any uncertain translations are marked `needs_review`.
 
+NocoDB and Baserow imports:
+
+```bash
+airvault import nocodb --path ./airtable-backup --dry-run --format json
+airvault import nocodb \
+  --path ./airtable-backup \
+  --url http://localhost:8080 \
+  --token "$NOCODB_TOKEN" \
+  --format json
+
+airvault import baserow --path ./airtable-backup --dry-run --format json
+airvault import baserow \
+  --path ./airtable-backup \
+  --url http://localhost:8081 \
+  --token "$BASEROW_TOKEN" \
+  --workspace 1 \
+  --format json
+```
+
+These importers are archive-driven, so they do not require live Airtable access. They create local NocoDB/Baserow databases and tables from the backup, preserve Airtable record IDs, and store complex Airtable-only values as JSON text where there is no one-to-one target field. See `docs/nocodb-import-notes.md` and `docs/baserow-import-notes.md` for live-tested endpoint behavior and target-specific constraints.
+
 Profiles and config:
 
 ```bash

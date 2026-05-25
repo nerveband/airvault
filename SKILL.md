@@ -37,6 +37,15 @@ airvault import grist --path ./airtable-backup --dry-run --format json
 airvault import grist --path ./airtable-backup --url http://localhost:8484 --workspace 3 --api-key "$GRIST_API_KEY" --include-formulas --include-attachments --report grist-migration-report.json --format json
 ```
 
+NocoDB and Baserow imports:
+
+```bash
+airvault import nocodb --path ./airtable-backup --dry-run --format json
+airvault import nocodb --path ./airtable-backup --url http://localhost:8080 --token "$NOCODB_TOKEN" --format json
+airvault import baserow --path ./airtable-backup --dry-run --format json
+airvault import baserow --path ./airtable-backup --url http://localhost:8081 --token "$BASEROW_TOKEN" --workspace 1 --format json
+```
+
 Testing:
 
 ```bash
@@ -60,6 +69,7 @@ airvault config set-defaults --backup-root ./airtable-backups --verify-mode exis
 - Attachment URLs expire, so real backup runs download files immediately.
 - Linked records are preserved by Airtable record IDs.
 - Formula field definitions are preserved in schema metadata when Airtable exposes them. `import grist --include-formulas` translates simple formulas into Grist formula columns and reports formulas that need review.
+- `import nocodb` and `import baserow` are archive-driven and do not require live Airtable access. Complex Airtable-only values are stored as JSON text for portability.
 - Comments are backed up only when `--include comments` is set and the token has the required scope.
 - Interfaces, automations, extensions, and permissions are reported in `gap-report.json` as unsupported surfaces.
 - API restrictions and rate limits are reported in `api-telemetry.json`. Review it after live runs.
